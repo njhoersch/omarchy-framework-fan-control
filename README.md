@@ -18,7 +18,7 @@ Do not run another fan-control service at the same time; two controllers will ra
 Install from Git once this repository is published:
 
 ```bash
-omarchy plugin add https://github.com/OWNER/omarchy-framework-fan-control.git --yes
+omarchy plugin add https://github.com/njhoersch/omarchy-framework-fan-control.git --yes
 cd ~/.config/omarchy/plugins/nate.framework.fan-control
 sudo ./setup install
 omarchy plugin enable nate.framework.fan-control --before omarchy.power
