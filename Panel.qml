@@ -239,27 +239,49 @@ Panel {
             fontFamily: root.bar.fontFamily
           }
 
-          ButtonGroup {
-            id: modeGroup
-            anchors.horizontalCenter: parent.horizontalCenter
-            options: [
-              { value: "automatic", label: "Automatic" },
-              { value: "manual", label: "Manual" }
-            ]
-            value: root.manual ? "manual" : "automatic"
-            cursorIndex: root.cursorActive && root.focusSection === "mode" ? root.modeCursorIndex : -1
-            focusable: false
-            foreground: root.bar.foreground
-            background: root.bar.background
-            fontFamily: root.bar.fontFamily
+          Row {
+            id: modeButtons
+            width: parent.width
+            spacing: Style.spacing.md
             enabled: root.available && !root.actionBusy
             opacity: enabled ? 1 : 0.45
-            onChanged: function(value) { root.selectMode(value) }
-            onHovered: function(index, hovered) {
-              if (!hovered) return
-              root.cursorActive = true
-              root.focusSection = "mode"
-              root.modeCursorIndex = index
+
+            Button {
+              width: (modeButtons.width - modeButtons.spacing) / 2
+              text: "Automatic"
+              iconText: "󱜝"
+              selected: !root.manual
+              hasCursor: root.cursorActive && root.focusSection === "mode" && root.modeCursorIndex === 0
+              bordered: true
+              foreground: root.bar.foreground
+              background: root.bar.background
+              fontFamily: root.bar.fontFamily
+              onClicked: root.selectMode("automatic")
+              onHovered: function(hovered) {
+                if (!hovered) return
+                root.cursorActive = true
+                root.focusSection = "mode"
+                root.modeCursorIndex = 0
+              }
+            }
+
+            Button {
+              width: (modeButtons.width - modeButtons.spacing) / 2
+              text: "Manual"
+              iconText: "󰈐"
+              selected: root.manual
+              hasCursor: root.cursorActive && root.focusSection === "mode" && root.modeCursorIndex === 1
+              bordered: true
+              foreground: root.bar.foreground
+              background: root.bar.background
+              fontFamily: root.bar.fontFamily
+              onClicked: root.selectMode("manual")
+              onHovered: function(hovered) {
+                if (!hovered) return
+                root.cursorActive = true
+                root.focusSection = "mode"
+                root.modeCursorIndex = 1
+              }
             }
           }
         }
