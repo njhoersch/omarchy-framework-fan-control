@@ -19,6 +19,7 @@ Panel {
   property string actionError: ""
   property string focusSection: "mode"
   property bool cursorActive: false
+  property int modeCursorIndex: 0
 
   readonly property bool available: fanState && fanState.available === true
   readonly property bool manual: available && fanState.mode === "manual"
@@ -44,6 +45,8 @@ Panel {
     } else if (next.available && next.mode === "manual" && !root.actionBusy) {
       root.stagedPercent = Model.snapPercent(next.percent)
     }
+    if (next.available && !root.actionBusy)
+      root.modeCursorIndex = next.mode === "manual" ? 1 : 0
   }
 
   function runAction(arguments) {
@@ -64,9 +67,14 @@ Panel {
     root.runAction(["manual", String(snapped)])
   }
 
-  function toggleMode() {
-    if (root.manual) root.setAutomatic()
-    else root.setManual(root.stagedPercent)
+  function selectMode(mode) {
+    if (mode === "automatic") {
+      root.modeCursorIndex = 0
+      if (root.manual) root.setAutomatic()
+    } else if (mode === "manual") {
+      root.modeCursorIndex = 1
+      if (!root.manual) root.setManual(root.stagedPercent)
+    }
   }
 
   function adjustStage(delta) {
@@ -86,6 +94,7 @@ Panel {
     if (opened) {
       root.refresh()
       root.focusSection = "mode"
+      root.modeCursorIndex = root.manual ? 1 : 0
       root.cursorActive = false
     }
   }
@@ -151,13 +160,18 @@ Panel {
       onMoveRequested: function(dx, dy) {
         root.cursorActive = true
         if (dy !== 0) root.focusSection = root.focusSection === "mode" ? "speed" : "mode"
-        else if (dx !== 0 && root.focusSection === "speed" && root.available && !root.actionBusy)
-          root.adjustStage(dx)
+        else if (dx !== 0 && root.available && !root.actionBusy) {
+          if (root.focusSection === "mode")
+            root.modeCursorIndex = Math.max(0, Math.min(1, root.modeCursorIndex + dx))
+          else
+            root.adjustStage(dx)
+        }
       }
       onActivateRequested: {
         root.cursorActive = true
         if (!root.available || root.actionBusy) return
-        if (root.focusSection === "mode") root.toggleMode()
+        if (root.focusSection === "mode")
+          root.selectMode(root.modeCursorIndex === 0 ? "automatic" : "manual")
         else if (root.manual) root.setManual(root.stagedPercent)
       }
       onCloseRequested: root.close()
@@ -215,21 +229,38 @@ Panel {
 
         PanelSeparator { foreground: root.bar.foreground }
 
-        Toggle {
+        Column {
           width: parent.width
-          label: "Manual control"
-          description: root.manual ? "Firmware control is paused" : "Firmware controls the fan automatically"
-          checked: root.manual
-          hasCursor: root.cursorActive && root.focusSection === "mode"
-          foreground: root.bar.foreground
-          fontFamily: root.bar.fontFamily
-          enabled: root.available && !root.actionBusy
-          opacity: enabled ? 1 : 0.45
-          onClicked: root.toggleMode()
-          onHovered: function(hovered) {
-            if (!hovered) return
-            root.cursorActive = true
-            root.focusSection = "mode"
+          spacing: Style.space(8)
+
+          PanelSectionHeader {
+            text: "CONTROL MODE"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+          }
+
+          ButtonGroup {
+            id: modeGroup
+            anchors.horizontalCenter: parent.horizontalCenter
+            options: [
+              { value: "automatic", label: "Automatic" },
+              { value: "manual", label: "Manual" }
+            ]
+            value: root.manual ? "manual" : "automatic"
+            cursorIndex: root.cursorActive && root.focusSection === "mode" ? root.modeCursorIndex : -1
+            focusable: false
+            foreground: root.bar.foreground
+            background: root.bar.background
+            fontFamily: root.bar.fontFamily
+            enabled: root.available && !root.actionBusy
+            opacity: enabled ? 1 : 0.45
+            onChanged: function(value) { root.selectMode(value) }
+            onHovered: function(index, hovered) {
+              if (!hovered) return
+              root.cursorActive = true
+              root.focusSection = "mode"
+              root.modeCursorIndex = index
+            }
           }
         }
 
@@ -312,15 +343,6 @@ Panel {
           width: parent.width
         }
 
-        Text {
-          visible: root.available && !root.manual
-          text: "The staged speed is not applied until Manual control is enabled."
-          color: Qt.darker(root.bar.foreground, 1.4)
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-          width: parent.width
-        }
       }
     }
   }
