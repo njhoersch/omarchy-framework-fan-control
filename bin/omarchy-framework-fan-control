@@ -43,8 +43,23 @@ read_number() {
   printf '%s\n' "$value"
 }
 
+read_cpu_temp_c() {
+  local device=$1 label_file label input millidegrees
+  for label_file in "$device"/temp*_label; do
+    IFS= read -r label < "$label_file" || continue
+    label=${label,,}
+    [[ $label == *cpu* ]] || continue
+    input=${label_file%_label}_input
+    [[ -r $input ]] || continue
+    millidegrees=$(read_number "$input") || continue
+    printf '%d\n' "$(( (millidegrees + 500) / 1000 ))"
+    return 0
+  done
+  return 1
+}
+
 status() {
-  local device mode pwm rpm percent
+  local device mode pwm rpm percent cpu_temp cpu_temp_json
   if ! device=$(find_device); then
     printf '{"protocolVersion":%d,"available":false,"reason":"Expected exactly one controllable cros_ec fan"}\n' "$PROTOCOL_VERSION"
     return 0
@@ -67,8 +82,13 @@ status() {
   fi
 
   percent=$(( (pwm * 100 + 127) / 255 ))
-  printf '{"protocolVersion":%d,"available":true,"mode":"%s","percent":%d,"rpm":%d}\n' \
-    "$PROTOCOL_VERSION" "$mode" "$percent" "$rpm"
+  if cpu_temp=$(read_cpu_temp_c "$device"); then
+    cpu_temp_json=$cpu_temp
+  else
+    cpu_temp_json=null
+  fi
+  printf '{"protocolVersion":%d,"available":true,"mode":"%s","percent":%d,"rpm":%d,"cpuTempC":%s}\n' \
+    "$PROTOCOL_VERSION" "$mode" "$percent" "$rpm" "$cpu_temp_json"
 }
 
 test_writes_allowed() {
@@ -120,7 +140,7 @@ case ${1:-} in
     ;;
   version)
     (( $# == 1 )) || fail "version takes no arguments"
-    printf '0.1.0 protocol-%d\n' "$PROTOCOL_VERSION"
+    printf '0.1.1 protocol-%d\n' "$PROTOCOL_VERSION"
     ;;
   *)
     fail "usage: $0 <status|manual PERCENT|auto|version>"

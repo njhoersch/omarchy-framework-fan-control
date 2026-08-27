@@ -25,6 +25,7 @@ function unavailable(reason) {
     mode: "unknown",
     percent: 0,
     rpm: 0,
+    cpuTempC: null,
     reason: String(reason || "Fan control is unavailable")
   }
 }
@@ -52,6 +53,9 @@ function parseStatus(text) {
     mode: mode,
     percent: clamp(Math.round(Number(value.percent) || 0), 0, 100),
     rpm: Math.max(0, Math.round(Number(value.rpm) || 0)),
+    cpuTempC: value.cpuTempC === null || value.cpuTempC === undefined
+      ? null
+      : clamp(Math.round(Number(value.cpuTempC) || 0), -20, 150),
     reason: ""
   }
 }
@@ -59,5 +63,6 @@ function parseStatus(text) {
 function tooltip(state) {
   if (!state || !state.available) return state && state.reason ? state.reason : "Framework fan control unavailable"
   var label = state.mode === "manual" ? "Manual " + state.percent + "%" : "Automatic"
-  return "Fan: " + label + " · " + state.rpm + " RPM"
+  var temperature = state.cpuTempC === null || state.cpuTempC === undefined ? "" : " · CPU " + state.cpuTempC + "°C"
+  return "Fan: " + label + " · " + state.rpm + " RPM" + temperature
 }

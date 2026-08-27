@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "nate.framework.fan-control",
   "name": "Omarchy Framework Fan Control",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Nathan Hoersch",
   "license": "MIT",
   "description": "Automatic and ten-step manual fan control for Framework laptops using Linux cros_ec hwmon",

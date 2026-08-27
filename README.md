@@ -1,6 +1,6 @@
 # Omarchy Framework Fan Control
 
-A native Omarchy bar widget for Framework laptops whose Linux kernel exposes a controllable `cros_ec` hwmon fan. It shows current RPM, offers ten manual steps from 10% through 100%, and provides explicit Automatic and Manual control modes.
+A native Omarchy bar widget for Framework laptops whose Linux kernel exposes a controllable `cros_ec` hwmon fan. It shows current RPM and the primary CPU-labeled EC temperature, offers ten manual steps from 10% through 100%, and provides explicit Automatic and Manual control modes.
 
 The slider is deliberately staged while Automatic mode is active. Moving it does not change the fan until Manual control is explicitly enabled. Manual 0% is not offered.
 

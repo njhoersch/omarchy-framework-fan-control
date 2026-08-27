@@ -25,6 +25,9 @@ Panel {
   readonly property bool manual: available && fanState.mode === "manual"
   readonly property string modeLabel: manual ? "MANUAL " + fanState.percent + "%" : "AUTOMATIC"
   readonly property string statusLabel: available ? fanState.rpm + " RPM" : "UNAVAILABLE"
+  readonly property string temperatureLabel: available && fanState.cpuTempC !== null
+    ? " · CPU " + fanState.cpuTempC + "°C"
+    : ""
 
   function configuredDefaultPercent() {
     return Model.snapPercent(root.setting("defaultManualPercent", 50))
@@ -215,7 +218,9 @@ Panel {
             }
 
             Text {
-              text: root.available ? root.modeLabel + " · " + root.statusLabel : root.statusLabel
+              text: root.available
+                ? root.modeLabel + " · " + root.statusLabel + root.temperatureLabel
+                : root.statusLabel
               color: Qt.darker(root.bar.foreground, 1.4)
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption

@@ -21,12 +21,15 @@ printf 'cros_ec\n' > "$TEST_ROOT/hwmon4/name"
 printf '0\n' > "$TEST_ROOT/hwmon4/fan1_input"
 printf '0\n' > "$TEST_ROOT/hwmon4/pwm1"
 printf '2\n' > "$TEST_ROOT/hwmon4/pwm1_enable"
+printf 'cpu_f75303@4d\n' > "$TEST_ROOT/hwmon4/temp2_label"
+printf '42750\n' > "$TEST_ROOT/hwmon4/temp2_input"
 
 export OMARCHY_FRAMEWORK_FAN_TEST_ROOT="$TEST_ROOT"
 
 status=$($HELPER status)
 assert_equal "$(jq -r .mode <<<"$status")" auto
 assert_equal "$(jq -r .rpm <<<"$status")" 0
+assert_equal "$(jq -r .cpuTempC <<<"$status")" 43
 
 $HELPER manual 10
 assert_equal "$(<"$TEST_ROOT/hwmon4/pwm1_enable")" 1
