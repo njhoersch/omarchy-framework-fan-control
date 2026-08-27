@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+shopt -s nullglob
+
+readonly PROTOCOL_VERSION=1
+readonly DEFAULT_HWMON_ROOT=/sys/class/hwmon
+
+fail() {
+  printf 'omarchy-framework-fan-control: %s\n' "$*" >&2
+  exit 1
+}
+
+hwmon_root() {
+  if (( EUID != 0 )) && [[ -n ${OMARCHY_FRAMEWORK_FAN_TEST_ROOT:-} ]]; then
+    printf '%s\n' "$OMARCHY_FRAMEWORK_FAN_TEST_ROOT"
+  else
+    printf '%s\n' "$DEFAULT_HWMON_ROOT"
+  fi
+}
+
+find_device() {
+  local root name_file name
+  local -a matches=()
+  root=$(hwmon_root)
+
+  for name_file in "$root"/hwmon*/name; do
+    IFS= read -r name < "$name_file" || continue
+    [[ $name == cros_ec ]] || continue
+    local device=${name_file%/name}
+    [[ -r $device/fan1_input && -r $device/pwm1 && -r $device/pwm1_enable ]] || continue
+    matches+=("$device")
+  done
+
+  (( ${#matches[@]} == 1 )) || return 1
+  printf '%s\n' "${matches[0]}"
+}
+
+read_number() {
+  local file=$1 value
+  IFS= read -r value < "$file" || return 1
+  [[ $value =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$value"
+}
+
+status() {
+  local device mode pwm rpm percent
+  if ! device=$(find_device); then
+    printf '{"protocolVersion":%d,"available":false,"reason":"Expected exactly one controllable cros_ec fan"}\n' "$PROTOCOL_VERSION"
+    return 0
+  fi
+
+  if ! mode=$(read_number "$device/pwm1_enable") ||
+     ! pwm=$(read_number "$device/pwm1") ||
+     ! rpm=$(read_number "$device/fan1_input"); then
+    printf '{"protocolVersion":%d,"available":false,"reason":"Could not read cros_ec fan state"}\n' "$PROTOCOL_VERSION"
+    return 0
+  fi
+
+  if [[ $mode == 1 ]]; then
+    mode=manual
+  elif [[ $mode == 2 ]]; then
+    mode=auto
+  else
+    printf '{"protocolVersion":%d,"available":false,"reason":"Unsupported cros_ec fan mode"}\n' "$PROTOCOL_VERSION"
+    return 0
+  fi
+
+  percent=$(( (pwm * 100 + 127) / 255 ))
+  printf '{"protocolVersion":%d,"available":true,"mode":"%s","percent":%d,"rpm":%d}\n' \
+    "$PROTOCOL_VERSION" "$mode" "$percent" "$rpm"
+}
+
+test_writes_allowed() {
+  (( EUID != 0 )) && [[ -n ${OMARCHY_FRAMEWORK_FAN_TEST_ROOT:-} ]]
+}
+
+require_write_access() {
+  if (( EUID != 0 )) && ! test_writes_allowed; then
+    fail "fan mode changes require root"
+  fi
+}
+
+set_auto() {
+  local device
+  require_write_access
+  device=$(find_device) || fail "expected exactly one controllable cros_ec fan"
+  printf '2\n' > "$device/pwm1_enable" || fail "could not restore automatic fan control"
+}
+
+set_manual() {
+  local percent=$1 device pwm
+  [[ $percent =~ ^[0-9]+$ ]] || fail "manual percentage must be a number"
+  (( percent >= 10 && percent <= 100 && percent % 10 == 0 )) ||
+    fail "manual percentage must be 10 through 100 in steps of 10"
+
+  require_write_access
+  device=$(find_device) || fail "expected exactly one controllable cros_ec fan"
+  pwm=$(( (percent * 255 + 50) / 100 ))
+
+  printf '1\n' > "$device/pwm1_enable" || fail "could not enable manual fan control"
+  if ! printf '%d\n' "$pwm" > "$device/pwm1"; then
+    printf '2\n' > "$device/pwm1_enable" 2>/dev/null || true
+    fail "could not set manual fan speed; automatic control was requested"
+  fi
+}
+
+case ${1:-} in
+  status)
+    (( $# == 1 )) || fail "status takes no arguments"
+    status
+    ;;
+  manual)
+    (( $# == 2 )) || fail "usage: $0 manual <10|20|...|100>"
+    set_manual "$2"
+    ;;
+  auto)
+    (( $# == 1 )) || fail "auto takes no arguments"
+    set_auto
+    ;;
+  version)
+    (( $# == 1 )) || fail "version takes no arguments"
+    printf '0.1.0 protocol-%d\n' "$PROTOCOL_VERSION"
+    ;;
+  *)
+    fail "usage: $0 <status|manual PERCENT|auto|version>"
+    ;;
+esac

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly HELPER=/usr/local/libexec/omarchy-framework-fan-control
+manual_percent=${1:-50}
+
+cleanup() {
+  sudo -n "$HELPER" auto || printf 'WARNING: automatic fan cleanup failed\n' >&2
+}
+trap cleanup EXIT INT TERM
+
+printf 'Initial: '
+"$HELPER" status
+sudo -n "$HELPER" manual "$manual_percent"
+sleep 2
+printf 'Manual: '
+"$HELPER" status
+sudo -n "$HELPER" auto
+printf 'Restored: '
+"$HELPER" status
+trap - EXIT INT TERM

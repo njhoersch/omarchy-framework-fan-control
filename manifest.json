@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "nate.framework.fan-control",
+  "name": "Omarchy Framework Fan Control",
+  "version": "0.1.0",
+  "author": "Nathan Hoersch",
+  "license": "MIT",
+  "description": "Automatic and ten-step manual fan control for Framework laptops using Linux cros_ec hwmon",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Framework Fan Control",
+    "description": "Switch a compatible Framework fan between automatic control and ten manual speed steps",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "defaultManualPercent": 50
+    },
+    "schema": [
+      {
+        "key": "defaultManualPercent",
+        "type": "integer",
+        "label": "Default manual fan speed",
+        "min": 10,
+        "max": 100,
+        "step": 10,
+        "defaultValue": 50,
+        "description": "The staged fan speed when the shell starts in automatic mode."
+      }
+    ]
+  }
+}

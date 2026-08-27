@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly HELPER=/usr/local/libexec/omarchy-framework-fan-control
+readonly SUDOERS_PREFIX=/etc/sudoers.d/omarchy-framework-fan-control
+readonly SOURCE_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+fail() {
+  printf 'setup: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  printf 'Usage: sudo ./setup <install|status|uninstall> [--user USER]\n'
+}
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || fail "run this setup as root"
+
+action=${1:-}
+[[ -n $action ]] || { usage; exit 1; }
+shift
+
+target_user=${SUDO_USER:-}
+while (( $# > 0 )); do
+  case $1 in
+    --user)
+      target_user=${2:-}
+      [[ -n $target_user ]] || fail "--user requires a user name"
+      shift 2
+      ;;
+    *) fail "unknown argument: $1" ;;
+  esac
+done
+
+[[ $target_user =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || fail "could not determine a safe target user; pass --user USER"
+id "$target_user" >/dev/null 2>&1 || fail "unknown user: $target_user"
+
+sudoers_file="$SUDOERS_PREFIX-$target_user"
+
+install_helper() {
+  /usr/bin/install -d -o root -g root -m 0755 /usr/local/libexec
+  /usr/bin/install -o root -g root -m 0755 "$SOURCE_DIR/bin/omarchy-framework-fan-control" "$HELPER"
+
+  local temporary
+  temporary=$(mktemp /etc/sudoers.d/.omarchy-framework-fan-control.XXXXXX)
+  trap 'rm -f -- "$temporary"' EXIT
+  {
+    printf '%s ALL=(root) NOPASSWD: ' "$target_user"
+    printf '%s auto' "$HELPER"
+    local percent
+    for percent in 10 20 30 40 50 60 70 80 90 100; do
+      printf ', %s manual %d' "$HELPER" "$percent"
+    done
+    printf '\n'
+  } > "$temporary"
+  chmod 0440 "$temporary"
+  /usr/sbin/visudo -cf "$temporary" >/dev/null
+  /usr/bin/install -o root -g root -m 0440 "$temporary" "$sudoers_file"
+  rm -f -- "$temporary"
+  trap - EXIT
+  printf 'Installed helper and sudo rule for %s\n' "$target_user"
+}
+
+show_status() {
+  [[ -x $HELPER ]] || fail "helper is not installed"
+  [[ $(stat -c '%U:%G:%a' "$HELPER") == root:root:755 ]] || fail "helper ownership or mode is unsafe"
+  [[ -f $sudoers_file ]] || fail "sudo rule is not installed for $target_user"
+  /usr/sbin/visudo -cf "$sudoers_file" >/dev/null
+  "$HELPER" version
+  "$HELPER" status
+}
+
+uninstall_helper() {
+  if [[ -x $HELPER ]]; then
+    "$HELPER" auto || fail "could not restore automatic fan control; refusing to uninstall"
+  fi
+  rm -f -- "$sudoers_file"
+  rm -f -- "$HELPER"
+  printf 'Removed helper and sudo rule for %s; fan control is automatic\n' "$target_user"
+}
+
+case $action in
+  install) install_helper ;;
+  status) show_status ;;
+  uninstall) uninstall_helper ;;
+  *) usage; exit 1 ;;
+esac

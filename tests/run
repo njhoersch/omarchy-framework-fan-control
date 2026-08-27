@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly PLUGIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+
+node "$PLUGIN_DIR/tests/model.test.js"
+"$PLUGIN_DIR/tests/helper.test.sh"
+jq -e . "$PLUGIN_DIR/manifest.json" >/dev/null
+omarchy plugin validate "$PLUGIN_DIR"
+
+printf 'all tests passed\n'
