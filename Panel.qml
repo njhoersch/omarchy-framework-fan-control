@@ -140,7 +140,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.manual ? "󰈐" : "󰒓"
+    text: root.manual ? "󰒓" : "󰈐"
     active: root.manual
     dimmed: !root.available
     tooltipText: Model.tooltip(root.fanState)
